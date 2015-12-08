@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# load configuration
+# TODO: remove me
+. $(dirname "$0")/conf.sh
+
+die() {
+    echo $@ >&2
+    exit 1
+}
+
+NOW=$(date '+%Y-%m-%d %H:%M:%S')
+
+# ensure required paths exist
+mkdir -p "$TARGET"
+mkdir -p "$MNT" || (mount | grep -q "$MNT" && umount "$MNT")
+
+# ensure there is no other lbak process running
+LOCK="$TARGET/.lock"
+if test -f "$LOCK"; then
+    ps ax | grep "^[[:space:]]*$(cat "$LOCK") " && die "Backup in progress by PID $(cat "$LOCK")"
+fi
+echo $$ > "$LOCK"
+
+for LVCONF in $LVS; do
+    # gather variables
+    LV=${LVCONF%:*}
+    SIZE=${LVCONF#*:}
+    test "$SIZE" = "$LVCONF" && SIZE="1G"
+    SNAPLV=$LV.lbak_snap
+    FOLDER=$(lvdisplay $LV | grep "LV Path" | sed 's+.*LV Path */dev/++' | tr / -)
+    # remove old snap volume
+    test lvdisplay $SNAPLV 2>/dev/null && lvremove -f $SNAPLV >/dev/null
+    # create new snap volume
+    lvcreate -L $SIZE -s $LV -n $SNAPLV >/dev/null
+    # mount snap volume
+    mount $SNAPLV "$MNT"
+    # make local backup
+        FROM="$MNT"
+        TO="$TARGET/$FOLDER"
+        TMPTO="$TO/_flat/$NOW (incomplete)"
+        mkdir -p "$TMPTO/.lbak"
+        RSYNCOPTS="--archive --human-readable --delete --max-size=50M"
+        test -e "$TO/latest" && RSYNCOPTS="$RSYNCOPTS --link-dest=$TO/latest"
+        rsync $RSYNCOPTS "$FROM/" "$TMPTO"
+        mv "$TMPTO" "$TO/_flat/$NOW"
+        rm -f "$TO/latest"
+        ln -s "_flat/$NOW" "$TO/latest"
+    # done, unmount and remove snap volume
+    umount "$MNT"
+    lvremove -f $SNAPLV >/dev/null
+    # clean up
+        # (hourly data)
+        mkdir -p "$TO/hourly"
+        rm -f "$TO/hourly/"*
+        ls "$TO/_flat" | uniq --check-chars=13 | tail -n 12 | while read BAK; do
+            ln -s "../_flat/$BAK" "$TO/hourly"
+        done
+        # (daily data)
+        mkdir -p "$TO/daily"
+        rm -f "$TO/daily/"*
+        ls "$TO/_flat" | uniq --check-chars=10 | tail -n 30 | while read BAK; do
+            ln -s "../_flat/$BAK" "$TO/daily"
+        done
+        # (monthly data)
+        mkdir -p "$TO/monthly"
+        rm -f "$TO/monthly/"*
+        ls "$TO/_flat" | uniq --check-chars=7 | tail -n 12 | while read BAK; do
+            ln -s "../_flat/$BAK" "$TO/monthly"
+        done
+        # (yearly data)
+        mkdir -p "$TO/yearly"
+        rm -f "$TO/yearly/"*
+        ls "$TO/_flat" | uniq --check-chars=7 | tail -n 10 | while read BAK; do
+            ln -s "../_flat/$BAK" "$TO/yearly"
+        done
+done
