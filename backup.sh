@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# debug
+# set -x
+
 # load configuration
 # TODO: remove me
 . $(dirname "$0")/conf.sh
@@ -10,6 +13,7 @@ die() {
 }
 
 NOW=$(date '+%Y-%m-%d %H:%M:%S')
+test -z "$LVM" && LVM=/sbin/lvm
 
 # ensure required paths exist
 mkdir -p "$TARGET"
@@ -28,11 +32,11 @@ for LVCONF in $LVS; do
     SIZE=${LVCONF#*:}
     test "$SIZE" = "$LVCONF" && SIZE="1G"
     SNAPLV=$LV.lbak_snap
-    FOLDER=$(lvdisplay $LV | grep "LV Path" | sed 's+.*LV Path */dev/++' | tr / -)
+    FOLDER=$($LVM lvdisplay $LV | grep "LV Path" | sed 's+.*LV Path */dev/++' | tr / -)
     # remove old snap volume
-    test lvdisplay $SNAPLV 2>/dev/null && lvremove -f $SNAPLV >/dev/null
+    test $LVM lvdisplay $SNAPLV 2>/dev/null && $LVM lvremove -f $SNAPLV >/dev/null
     # create new snap volume
-    lvcreate -L $SIZE -s $LV -n $SNAPLV >/dev/null
+    $LVM lvcreate -L $SIZE -s $LV -n $SNAPLV >/dev/null
     # mount snap volume
     mount $SNAPLV "$MNT"
     # make local backup
@@ -42,13 +46,14 @@ for LVCONF in $LVS; do
         mkdir -p "$TMPTO/.lbak"
         RSYNCOPTS="--archive --human-readable --delete --max-size=50M"
         test -e "$TO/latest" && RSYNCOPTS="$RSYNCOPTS --link-dest=$TO/latest"
+        test -e "$FROM/.lbak-exclude" && RSYNCOPTS="$RSYNCOPTS --exclude-from=$FROM/.lbak-exclude"
         rsync $RSYNCOPTS "$FROM/" "$TMPTO"
         mv "$TMPTO" "$TO/_flat/$NOW"
         rm -f "$TO/latest"
         ln -s "_flat/$NOW" "$TO/latest"
     # done, unmount and remove snap volume
     umount "$MNT"
-    lvremove -f $SNAPLV >/dev/null
+    $LVM lvremove -f $SNAPLV >/dev/null
     # clean up
         # (hourly data)
         mkdir -p "$TO/hourly"
@@ -75,3 +80,5 @@ for LVCONF in $LVS; do
             ln -s "../_flat/$BAK" "$TO/yearly"
         done
 done
+
+rm -f "$LOCK"
