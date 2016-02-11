@@ -20,7 +20,7 @@ mkdir -p "$TARGET"
 mkdir -p "$MNT" || (mount | grep -q "$MNT" && umount "$MNT")
 
 # ensure there is no other lbak process running
-LOCK="$TARGET/.lock"
+LOCK="$TARGET/.lock.lbak"
 if test -f "$LOCK"; then
     ps ax | grep "^[[:space:]]*$(cat "$LOCK") " && die "Backup in progress by PID $(cat "$LOCK")"
 fi
