@@ -76,7 +76,7 @@ for LVCONF in $LVS; do
         # (yearly data)
         mkdir -p "$TO/yearly"
         rm -f "$TO/yearly/"*
-        ls "$TO/_flat" | uniq --check-chars=7 | tail -n 10 | while read BAK; do
+        ls "$TO/_flat" | uniq --check-chars=4 | while read BAK; do
             ln -s "../_flat/$BAK" "$TO/yearly"
         done
         # remove unreferenced instances
