@@ -79,6 +79,11 @@ for LVCONF in $LVS; do
         ls "$TO/_flat" | uniq --check-chars=7 | tail -n 10 | while read BAK; do
             ln -s "../_flat/$BAK" "$TO/yearly"
         done
+        # remove unreferenced instances
+        USED=$(find "$TO" -maxdepth 2 -mindepth 2 -type l -exec basename "{}" \;)
+        for SNAPSHOT in "$TO"/_flat/*; do
+            echo "$USED" | grep -q "$(basename "$SNAPSHOT")" || rm -rf "$SNAPSHOT"
+        done
 done
 
 rm -f "$LOCK"
