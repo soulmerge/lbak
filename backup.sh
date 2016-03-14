@@ -44,7 +44,7 @@ for LVCONF in $LVS; do
         TO="$TARGET/$FOLDER"
         TMPTO="$TO/_flat/$NOW (incomplete)"
         mkdir -p "$TMPTO/.lbak"
-        RSYNCOPTS="--archive --human-readable --delete --max-size=50M"
+        RSYNCOPTS="--archive --delete --max-size=50M"
         test -e "$TO/latest" && RSYNCOPTS="$RSYNCOPTS --link-dest=$TO/latest"
         test -e "$FROM/.lbak-exclude" && RSYNCOPTS="$RSYNCOPTS --exclude-from=$FROM/.lbak-exclude"
         rsync $RSYNCOPTS "$FROM/" "$TMPTO"
@@ -85,5 +85,9 @@ for LVCONF in $LVS; do
             echo "$USED" | grep -q "$(basename "$SNAPSHOT")" || rm -rf "$SNAPSHOT"
         done
 done
+
+if [[ "$OFFSITE" ]]; then
+    rsync --archive --compress --delete --hard-links--numeric-ids "$TARGET" "$OFFSITE"
+fi
 
 rm -f "$LOCK"
