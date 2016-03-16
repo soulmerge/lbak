@@ -87,7 +87,7 @@ for LVCONF in $LVS; do
 done
 
 if [[ "$OFFSITE" ]]; then
-    rsync --archive --compress --delete --hard-links--numeric-ids "$TARGET" "$OFFSITE"
+    rsync --archive --compress --delete --hard-links --numeric-ids "$TARGET" "$OFFSITE"
 fi
 
 rm -f "$LOCK"
