@@ -7,6 +7,10 @@
 # TODO: remove me
 . $(dirname "$0")/conf.sh
 
+if test -n "$SKIPIFPROC"; then
+    ps ax | grep "$SKIPIFPROC" | grep -qv grep && exit 0
+fi
+
 die() {
     echo $@ >&2
     exit 1
